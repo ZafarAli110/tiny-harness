@@ -1,0 +1,145 @@
+:root {
+  --ink: #16202a;
+  --muted: #5b6876;
+  --paper: #ffffff;
+  --panel: #f2f5f8;
+  --rule: #d8dee5;
+  --accent: #0e7c66;
+  --accent-ink: #ffffff;
+  --radius: 10px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 32px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+.logo {
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+nav a {
+  margin-left: 24px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+nav a:hover {
+  color: var(--accent);
+}
+
+main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.hero {
+  padding: 72px 0 56px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.85rem;
+}
+
+h1 {
+  margin: 8px 0 12px;
+  font-size: 3rem;
+  line-height: 1.1;
+}
+
+.lead {
+  max-width: 560px;
+  color: var(--muted);
+  font-size: 1.2rem;
+}
+
+.button {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.section {
+  padding: 40px 0;
+  border-top: 1px solid var(--rule);
+}
+
+h2 {
+  margin: 0 0 16px;
+  font-size: 1.8rem;
+}
+
+.talks {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.talk {
+  display: flex;
+  gap: 20px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.talk h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.talk p {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.time {
+  min-width: 56px;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.site-footer {
+  margin-top: 40px;
+  padding: 24px 32px;
+  background: var(--panel);
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.9rem;
+}

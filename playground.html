@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From model to agent</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* One palette for the whole page. */
+  :root {
+    --outer: #0b0f10; --paper: #161d1f; --panel: #1e2729; --line: #2d3a3d; --rule: #5e7276;
+    --ink: #d3dbd9; --muted: #a3b2b0; --cyan: #63c2ce; --coral: #de8352; --green: #6fc392; --red: #e0705f;
+    --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --display: "Rajdhani", "IBM Plex Sans", system-ui, sans-serif;
+    font: 18px/1.5 var(--sans); color: var(--ink);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--outer); min-height: 100vh; }
+  button, input, textarea { font: inherit; color: inherit; }
+
+  /* ── Top bar ── */
+  .bar { display: flex; align-items: center; gap: 28px; padding: 14px 32px; background: var(--paper); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+  .brand { font: 700 15px var(--mono); letter-spacing: .12em; color: var(--ink); white-space: nowrap; }
+  .brand i { color: var(--coral); font-style: normal; } .brand b { color: var(--cyan); }
+  nav { display: flex; gap: 6px; }
+  nav a { padding: 8px 18px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 600; }
+  nav a.on { background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+  nav a span { color: var(--cyan); margin-right: 6px; font-family: var(--mono); }
+
+  /* ── A stage: one idea per screen ── */
+  .stage { max-width: 1180px; margin: 0 auto; padding: 36px 32px 60px; }
+  .stage[hidden], .pane[hidden], .view[hidden] { display: none; }
+  .eyebrow { margin: 0; color: var(--cyan); font: 600 13px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  h1 { margin: 6px 0 4px; font: 700 46px/1.05 var(--display); color: #f1f5f4; }
+  .lead { margin: 0 0 26px; color: var(--muted); font-size: 20px; max-width: 760px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; }
+  .card + .card { margin-top: 16px; }
+  .quiet { color: var(--muted); font-size: 15px; }
+
+  /* ── Controls ── */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chips .label { color: var(--muted); font-size: 15px; margin-right: 4px; }
+  .chip-btn { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; font-size: 15px; }
+  .chip-btn:hover { border-color: var(--cyan); }
+  .primary { padding: 11px 24px; border-radius: 10px; border: 0; background: var(--cyan); color: #0b1a1d; font-weight: 700; cursor: pointer; }
+  .secondary { padding: 10px 20px; border-radius: 10px; border: 1px solid var(--rule); background: transparent; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: wait; }
+  textarea, input[type=text] { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); font-size: 20px; resize: vertical; }
+  textarea:focus, input[type=text]:focus { outline: 2px solid var(--cyan); outline-offset: -1px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  .system { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; color: var(--muted); font-size: 15px; white-space: nowrap; }
+  .system input { font-size: 15px; padding: 6px 10px; }
+  details { margin-top: 16px; color: var(--muted); font-size: 15px; }
+  details summary { cursor: pointer; color: var(--cyan); }
+  details[open] summary { margin-bottom: 10px; }
+
+  /* Steps inside a stage: one shown at a time */
+  .steps { display: inline-flex; gap: 4px; padding: 4px; background: var(--paper); border-radius: 12px; border: 1px solid var(--line); margin-bottom: 18px; }
+  .steps button { padding: 8px 18px; border-radius: 9px; border: 0; background: transparent; color: var(--muted); font-weight: 600; cursor: pointer; }
+  .steps button.on { background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+  .steps button span { font-family: var(--mono); color: var(--cyan); margin-right: 6px; }
+
+  /* ── Tokens ── */
+  .tokens { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 12px; min-height: 64px; }
+  .token { font: 600 24px var(--mono); padding: 8px 12px 6px; border-radius: 8px; background: #1d3a3f; color: #e8f6f7; white-space: pre; }
+  .token:nth-child(even) { background: #4a2e22; color: #fbe8dc; }
+  .token small { display: block; font: 400 12px var(--mono); color: var(--muted); }
+  .big-stat { font: 600 18px var(--mono); color: var(--muted); }
+  .big-stat b { color: var(--ink); font-size: 26px; }
+  .note { margin: 16px 0 0; padding: 12px 16px; border-left: 3px solid var(--coral); background: var(--paper); border-radius: 0 10px 10px 0; color: var(--muted); font-size: 16px; }
+  .note b { color: var(--ink); } .note i { color: var(--cyan); font-style: normal; }
+
+  /* ── The model ── */
+  .response { min-height: 90px; padding: 16px 18px; border-radius: 10px; background: var(--paper); font-size: 21px; white-space: pre-wrap; }
+  .picks { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+  .picks .token { font-size: 20px; position: relative; }
+  .picks .token.first::after { content: "1st pick"; position: absolute; top: -9px; left: 6px; padding: 0 5px; border-radius: 4px; background: #f2c94c; color: #1a1500; font: 600 10px var(--sans); }
+  h2.mini { margin: 0 0 2px; font: 700 24px var(--display); color: #f1f5f4; }
+  .sent { margin-top: 14px; font: 14px/1.5 var(--mono); color: var(--muted); }
+  .sent div { padding: 3px 0; border-bottom: 1px dashed var(--line); white-space: pre-wrap; word-break: break-word; }
+  .sent b { color: var(--cyan); font-weight: 600; }
+  .sent:not(:empty)::before { content: "Sent to the model:"; display: block; color: var(--ink); font: 600 13px var(--sans); margin-bottom: 4px; }
+  .bridge { margin: 18px 4px 0; font-size: 18px; color: var(--muted); }
+  .bridge b { color: var(--coral); } .bridge a { color: var(--cyan); }
+  .reply-view { margin-left: 10px; align-items: center; }
+  .reply-view .quiet { padding: 0 6px 0 10px; }
+  /* Text view: the same boxes, drawn as plain running text */
+  .as-text .picks { display: block; }
+  .as-text .picks .token { display: inline; padding: 0; border-radius: 0; background: none; color: var(--ink); font: 21px/1.5 var(--sans); white-space: pre-wrap; }
+  .as-text .picks .token.first::after { display: none; }
+  .limit { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; font-weight: 600; }
+  .limit input { width: 84px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); font: 600 17px var(--mono); }
+  .meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font: 14px var(--mono); }
+  .meter { height: 8px; background: var(--paper); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+  .meter div { height: 100%; width: 0; background: var(--cyan); transition: width .3s; }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 15px/1.5 var(--mono); }
+  .odds-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; align-items: start; }
+  .bar-row { display: grid; grid-template-columns: 70px 1fr 64px; gap: 12px; align-items: center; margin: 7px 0; font-family: var(--mono); }
+  .bar-row .track { height: 26px; background: var(--paper); border-radius: 6px; overflow: hidden; }
+  .bar-row .fill { display: block; height: 100%; background: var(--cyan); transition: width .25s; }
+  .bar-row.out { color: var(--rule); text-decoration: line-through; }
+  .bar-row.out .fill { background: var(--line); }
+  .bar-row .pct { text-align: right; font-size: 15px; }
+  .bar-row .pct { font-weight: 700; font-size: 17px; }
+  .bar-row .sub { grid-column: 2 / 4; margin-top: -4px; color: var(--muted); font-size: 12px; }
+  .pickable { margin: 14px 0 0; font-size: 18px; }
+  .pickable b { color: var(--cyan); }
+  .slider p { min-height: 2.6em; }
+  .slider { margin-bottom: 18px; }
+  .slider label { display: flex; justify-content: space-between; font-weight: 600; }
+  .slider output { font-family: var(--mono); color: var(--cyan); }
+  .slider p { margin: 2px 0 6px; color: var(--muted); font-size: 14px; }
+  input[type=range] { width: 100%; accent-color: var(--cyan); }
+  .tally { display: flex; flex-wrap: wrap; gap: 12px; min-height: 70px; margin-top: 18px; }
+  .tally span { font: 700 34px var(--mono); padding: 8px 18px; border-radius: 12px; background: var(--paper); }
+  .tally small { font-size: 18px; color: var(--cyan); margin-left: 6px; }
+
+  /* ── The agent ── */
+  .harness { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .switch { position: relative; }
+  .switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .switch span { display: inline-block; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--muted); cursor: pointer; font: 600 15px var(--mono); }
+  .switch input:checked + span { background: #1d3a3f; border-color: var(--cyan); color: #e8f6f7; }
+  .switch input:checked + span::before { content: "✓ "; color: var(--cyan); }
+  .tasks { display: inline-flex; gap: 4px; padding: 4px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+  .tasks label { position: relative; }
+  .tasks input { position: absolute; opacity: 0; }
+  .tasks span { display: block; padding: 7px 16px; border-radius: 9px; color: var(--muted); font-weight: 600; cursor: pointer; }
+  .tasks input:checked + span { background: var(--panel); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+  #tab-agent { max-width: 1440px; }
+  .agent { margin-top: 18px; scroll-margin-top: 78px; }
+  .side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .loopcount { float: right; font: 700 20px var(--mono); color: var(--cyan); }
+  .views { display: inline-flex; gap: 4px; }
+  .open-page { display: inline-block; margin-bottom: 8px; color: var(--cyan); font-weight: 600; text-decoration: none; }
+  .open-page:hover { text-decoration: underline; }
+  .views button { padding: 6px 14px; border-radius: 8px; border: 0; background: transparent; color: var(--muted); font-weight: 600; cursor: pointer; }
+  .views button.on { background: var(--paper); color: var(--ink); }
+  .views button .count { font: 12px var(--mono); margin-left: 6px; padding: 1px 6px; border-radius: 99px; background: var(--red); color: #fff; }
+  .views button .count.ok { background: var(--green); color: #0b1a12; }
+  .views button .count[hidden] { display: none; }
+  .log { font: 15px/1.55 var(--mono); max-height: calc(100vh - 300px); overflow: auto; white-space: pre-wrap; word-break: break-word; }
+  .log .turn { color: var(--cyan); font-weight: 700; margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .log .turn { cursor: pointer; }
+  .log .msgs { color: var(--muted); margin-bottom: 6px; }
+  .log .working { color: var(--coral); }
+  .log .msgs b { color: var(--ink); font-weight: 600; }
+  .log .msgs i { color: var(--cyan); font-style: normal; }
+  .log .msgs[hidden] { display: none; }
+  .log .call { color: var(--cyan); }
+  .log .result { color: var(--muted); }
+  .log .bad { color: var(--red); font-weight: 600; }
+  .log .good { color: var(--green); font-weight: 600; }
+  .log .idle { color: var(--muted); font-family: var(--sans); }
+  .log .why { margin: 10px 0; padding: 12px 14px; border-left: 3px solid var(--cyan); background: var(--paper); white-space: pre; overflow-x: auto; }
+  .log .why .head { color: var(--cyan); font-weight: 700; }
+  .log .why .bad, .log .why .good { display: inline; }
+  .checks { list-style: none; margin: 0; padding: 0; font-size: 17px; }
+  .checks li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .checks .ok::before { content: "✓  "; color: var(--green); } .checks .no::before { content: "✗  "; color: var(--red); }
+  iframe { width: 100%; height: calc(100vh - 280px); border: 0; border-radius: 10px; background: #fff; }
+  .context { color: var(--muted); font: 13px var(--mono); }
+
+  /* Permission: a question you can't miss */
+  .ask { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 16px 20px; border-radius: 14px; background: #2e2a18; border: 1px solid #f2c94c; font-size: 20px; }
+  .ask b { flex: 1; }
+  .ask[hidden] { display: none; }
+  .ask b { color: #f6e3a5; }
+  .error { color: var(--red); }
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="brand"><i>///</i> IDS <b>ENGINEERING</b></div>
+  <nav>
+    <a href="#tokens" data-tab="tokens"><span>1</span>Tokens</a>
+    <a href="#model" data-tab="model"><span>2</span>The model</a>
+    <a href="#agent" data-tab="agent"><span>3</span>The agent</a>
+  </nav>
+</div>
+
+<!-- ─────────────────────────────── 1 · TOKENS ─────────────────────────────── -->
+<section class="stage" id="tab-tokens">
+  <p class="eyebrow">How the model reads</p>
+  <h1>Tokens</h1>
+  <p class="lead">The model never sees letters or words, only tokens. Type anything and see how the model splits it.</p>
+  <div class="card">
+    <textarea id="token-input" rows="2">The cat sat on the mat.</textarea>
+    <div class="row chips" id="token-ideas"><span class="label">Try:</span></div>
+    <div class="tokens" id="chips"></div>
+    <div class="big-stat" id="token-stats"></div>
+    <p class="note"><b>Why some text costs more.</b> The tokenizer reflects what the model was trained on. Text it saw
+    less, such as names, Urdu and rare words, splits into more tokens: it uses more of the context window, and costs
+    more on paid APIs. Try <i>Jacob</i>, then <i>Zafar</i>: five letters each, one token against three.</p>
+    <details>
+      <summary>What am I looking at?</summary>
+      Each box is one token, with its number underneath: the model only ever works with those numbers. ␣ is a space,
+      which belongs to the word after it. Common words stay whole however long they are; rare ones split into pieces.
+      English averages about 4 characters a token. This is Qwen's own tokenizer; other models split differently.<br><br>
+      <span id="vocab">The vocabulary is fixed when the model is built.</span> It is made before training, by merging the
+      most frequent pieces of the training text until it reaches a chosen size; the model then learns one row of numbers
+      per piece, and picks every next token from exactly this list. Adding a piece would mean changing the model and
+      training it again.
+    </details>
+  </div>
+</section>
+
+<!-- ─────────────────────────────── 2 · THE MODEL ─────────────────────────────── -->
+<section class="stage" id="tab-model" hidden>
+  <p class="eyebrow">How the model answers</p>
+  <h1>The model on its own</h1>
+  <p class="lead">Text in, text out, one token at a time.</p>
+
+  <div class="steps" id="model-steps">
+    <button data-step="ask" class="on"><span>a</span>Ask</button>
+    <button data-step="odds"><span>b</span>The odds</button>
+    <button data-step="ten"><span>c</span>Ten tries</button>
+    <button data-step="reads"><span>d</span>What it reads</button>
+    <button data-step="memory"><span>e</span>Memory and the window</button>
+  </div>
+  <div class="steps reply-view" id="reply-view"><span class="quiet">Replies as</span><button data-view="tokens" class="on">Tokens</button><button data-view="text">Text</button></div>
+
+  <div class="card" id="prompt-card">
+    <div class="system"><span>System instruction</span><input type="text" id="system"></div>
+    <textarea id="prompt" rows="2"></textarea>
+    <div class="row chips" id="examples"><span class="label">Examples:</span></div>
+  </div>
+
+  <!-- a · Ask -->
+  <div class="card pane" id="pane-ask">
+    <div class="row" style="margin-top:0">
+      <button class="primary" id="run">Ask the model</button>
+      <label class="limit">Max tokens <input type="number" id="max_tokens" min="1" max="500" step="1"></label>
+      <span class="quiet">Each box is one token, one pick, in the order it was written.</span>
+    </div>
+    <div class="response picks" id="response" style="margin-top:16px"></div>
+    <div class="meta"><span id="finish"></span><span id="usage-short"></span></div>
+    <div class="meter"><div id="window-fill"></div></div>
+    <div class="context" id="window"></div>
+    <details>
+      <summary>More: the full usage, a stop text</summary>
+      <pre id="usage"></pre>
+      <label>Stop text <span class="quiet">(e.g. a full stop): it ends there, finish_reason "stop"</span><input type="text" id="stop" style="margin-top:6px;font-size:16px"></label>
+    </details>
+  </div>
+
+  <!-- b · The odds -->
+  <div class="card pane" id="pane-odds" hidden>
+    <div class="odds-layout">
+      <div>
+        <div class="row" style="margin-top:0"><button class="primary" id="show-odds">Show the odds</button><span class="quiet">The model's ten favourite first tokens.</span></div>
+        <p class="pickable" id="pickable"></p>
+        <div id="odds" style="margin-top:10px"></div>
+      </div>
+      <div>
+        <div class="slider"><label>Top-k · how many candidates <output id="top_k-value"></output></label><p id="k-explain"></p><input type="range" id="top_k" min="1" max="10" step="1"></div>
+        <div class="slider"><label>Top-p · how much of the odds <output id="top_p-value"></output></label><p id="p-explain"></p><input type="range" id="top_p" min="0.05" max="1" step="0.05"></div>
+        <div class="slider"><label>Temperature · how adventurous <output id="temperature-value"></output></label><p id="t-explain"></p><input type="range" id="temperature" min="0" max="2" step="0.1"></div>
+        <p class="quiet">Applied in this order: top-k and top-p cross candidates out, then temperature reshapes the odds of those left.</p>
+      </div>
+    </div>
+    <details>
+      <summary>When does temperature matter, and why doesn't it stop mistakes?</summary>
+      The bars are the odds for the next token, not for the answer. On Capital of France, “The” and “Paris” share
+      the odds, yet both end in Paris: they differ in how the model answers, not what. On Random number the
+      candidates are different answers, so temperature, top-k and top-p change what comes out.<br><br>
+      Temperature controls consistency, not truth. At 0 the model always takes its favourite token, so a wrong
+      favourite is wrong every time. Top-k and top-p cut off the unlikely candidates; temperature reshapes the odds of
+      the ones left. llama-server's extra min_p filter is turned off here so these are the only filters at work.
+    </details>
+  </div>
+
+  <!-- c · Ten tries -->
+  <div class="card pane" id="pane-ten" hidden>
+    <div class="row" style="margin-top:0"><button class="primary" id="ten">Ask ten times</button><span class="quiet" id="ten-settings"></span></div>
+    <div class="tally" id="tally"></div>
+  </div>
+
+  <!-- d · What it reads -->
+  <div class="card pane" id="pane-reads" hidden>
+    <div class="row" style="margin-top:0">
+      <label class="switch"><input type="checkbox" id="t-tool"><span>give it a tool: read_file</span></label>
+      <button class="primary" id="show-template">Show what the model reads</button>
+      <button class="secondary" id="t-reply">Show what it writes back</button>
+    </div>
+    <p class="quiet">The instruction, the prompt and any tools become one text. A tool is something the app can do for the
+      model, such as reading a file; the model only gets a description of it.</p>
+    <pre id="template" style="margin-top:16px"></pre>
+    <pre class="response" id="t-raw" style="margin-top:16px"></pre>
+    <p class="quiet" id="t-note"></p>
+  </div>
+
+  <!-- e · Memory and the window -->
+  <div class="pane" id="pane-memory" hidden>
+    <div class="card">
+      <h2 class="mini">Does it remember?</h2>
+      <p class="quiet">Every call starts from zero. Whatever the app sends is all the model knows.</p>
+      <div class="row">
+        <button class="secondary" id="m-name">Say: “My name is Zafar.”</button>
+        <button class="secondary" id="m-ask">Ask: “What is my name?”</button>
+        <label class="switch"><input type="checkbox" id="m-history"><span>send the history</span></label>
+        <button class="chip-btn" id="m-reset">Start over</button>
+      </div>
+      <div class="sent" id="m-sent"></div>
+      <div class="response picks" id="m-reply"></div>
+      <div class="meter"><div id="m-fill"></div></div>
+      <div class="context" id="m-window"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="mini">What it can see, and what it costs</h2>
+      <p class="quiet">The question: “How many hours did ticket DMS-107 take?” The answer in tickets.csv is 12.</p>
+      <div class="row">
+        <label class="switch"><input type="checkbox" id="f-paste"><span>paste tickets.csv in</span></label>
+        <label class="switch"><input type="checkbox" id="f-bury"><span>add 160 lines of server logs</span></label>
+        <button class="primary" id="f-ask">Ask about tickets.csv</button>
+      </div>
+      <div class="sent" id="f-sent"></div>
+      <div class="response picks" id="f-reply"></div>
+      <div class="meta"><span id="f-time"></span></div>
+      <div class="meter"><div id="f-fill"></div></div>
+      <div class="context" id="f-window"></div>
+    </div>
+
+    <p class="bridge">Here <b>you</b> are the loop: you read the reply, decide what to send next, and paste the file in
+    yourself. In <a href="#agent">The agent</a>, the model asks for the file and the app does it.</p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────── 3 · THE AGENT ─────────────────────────────── -->
+<section class="stage" id="tab-agent" hidden>
+  <p class="eyebrow">From model to agent</p>
+  <h1>The agent loop</h1>
+  <p class="lead">The same model, in a loop, with a harness around it. Switch the pieces on one at a time.</p>
+
+  <div class="card">
+    <div class="row" style="margin-top:0;justify-content:space-between">
+      <div class="tasks">
+        <label><input type="radio" name="a-task" value="tickets" checked><span>Average of tickets.csv</span></label>
+        <label><input type="radio" name="a-task" value="website"><span>Add a Contact section</span></label>
+      </div>
+      <button class="primary" id="a-run">Run the agent</button>
+    </div>
+    <div class="row harness">
+      <span class="quiet">Harness:</span>
+      <label class="switch"><input type="checkbox" id="a-readFile"><span>read_file</span></label>
+      <label class="switch"><input type="checkbox" id="a-runCommand"><span>run_command</span></label>
+      <label class="switch"><input type="checkbox" id="a-writeFile"><span>write_file</span></label>
+      <label class="switch"><input type="checkbox" id="a-rules"><span>rules</span></label>
+      <label class="switch"><input type="checkbox" id="a-askPermission"><span>ask permission</span></label>
+      <label class="switch"><input type="checkbox" id="a-turnLimit"><span>turn limit</span></label>
+      <label class="switch"><input type="checkbox" id="a-verify"><span>verification</span></label>
+      <label class="switch"><input type="checkbox" id="a-evaluate"><span>evaluation</span></label>
+    </div>
+  </div>
+
+  <div class="agent">
+    <div class="side">
+      <div class="ask" id="a-ask" hidden><b id="a-question"></b><button class="primary" id="a-yes">Yes</button><button class="secondary" id="a-no">No</button></div>
+      <div class="card">
+        <span class="loopcount" id="a-turn"></span>
+        <div class="views">
+          <button data-view="talk" class="on">Conversation</button>
+          <button data-view="page">The page</button>
+          <button data-view="checks">Tests<span class="count" id="a-count" hidden></span></button>
+        </div>
+        <div class="meter"><div id="a-fill"></div></div>
+        <div class="context" id="a-window">context window: empty</div>
+        <div class="view log" id="view-talk" style="margin-top:12px"><div class="idle">Press <b>Run the agent</b>. Each turn of the loop is marked as it runs.</div></div>
+        <div class="view" id="view-page" hidden style="margin-top:12px">
+          <a class="open-page" href="/site/index.html" target="_blank" rel="noopener">Open the page in a new tab ↗</a>
+          <iframe id="a-page" title="The page the agent edits"></iframe>
+        </div>
+        <div class="view" id="view-checks" hidden style="margin-top:12px"><ul class="checks" id="a-checks"><li class="quiet" style="border:0">Switch on verification or evaluation.</li></ul></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<script>
+const SERVER = "http://127.0.0.1:8080"; // llama-server
+const $ = (id) => document.getElementById(id);
+
+async function call(path, body) {
+  const response = await fetch(`${SERVER}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  return response.json();
+}
+
+// Server-sent events, one at a time ("data: {...}").
+async function* events(response) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) {
+      return;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (line.startsWith("data: ") && line !== "data: [DONE]") {
+        yield JSON.parse(line.slice(6));
+      }
+    }
+  }
+}
+
+async function contextWindow() {
+  const props = await (await fetch(`${SERVER}/props`)).json();
+  return props.default_generation_settings?.n_ctx ?? 0;
+}
+
+// Run work behind a button: disable it meanwhile, and show an error instead of failing silently.
+function action(button, work, onError) {
+  $(button).addEventListener("click", async () => {
+    $(button).disabled = true;
+    try {
+      await work();
+    } catch (error) {
+      onError(error);
+    } finally {
+      $(button).disabled = false;
+    }
+  });
+}
+const unreachable = () => `<span class="error">Could not reach the model at ${SERVER}. Is llama-server running?</span>`;
+
+// ── Tabs: #tokens, #model, #agent (a link can open one directly) ──
+function showTab() {
+  const name = (location.hash || "#tokens").slice(1);
+  for (const stage of document.querySelectorAll(".stage")) {
+    stage.hidden = stage.id !== `tab-${name}`;
+  }
+  for (const link of document.querySelectorAll("nav a")) {
+    link.classList.toggle("on", link.dataset.tab === name);
+  }
+}
+addEventListener("hashchange", showTab);
+showTab();
+
+// ════════════════════════════ 1 · Tokens ════════════════════════════
+const TOKEN_IDEAS = ["The cat sat on the mat.", "That was unbelievable.", "ChatGPT", "Jacob", "Zafar", "یہ ایک جملہ ہے", "😀👍", "getUserById(42)"];
+for (const idea of TOKEN_IDEAS) {
+  const chip = document.createElement("button");
+  chip.className = "chip-btn";
+  chip.textContent = idea;
+  chip.addEventListener("click", () => {
+    $("token-input").value = idea;
+    tokenize();
+  });
+  $("token-ideas").append(chip);
+}
+
+let tokenizing = 0;
+async function tokenize() {
+  const text = $("token-input").value;
+  const mine = ++tokenizing;
+  try {
+    const { tokens } = await call("/tokenize", { content: text, with_pieces: true });
+    if (mine !== tokenizing) { // a newer keystroke is already on its way
+      return;
+    }
+    // A piece that is only part of a character (half an emoji) comes back as raw bytes.
+    const show = (piece) => (typeof piece === "string" ? piece.replaceAll(" ", "␣").replaceAll("\n", "↵") : `‹${piece.length} bytes›`);
+    $("chips").innerHTML = "";
+    for (const token of tokens) {
+      const box = document.createElement("span");
+      box.className = "token";
+      box.textContent = show(token.piece);
+      const id = document.createElement("small");
+      id.textContent = token.id;
+      box.append(id);
+      $("chips").append(box);
+    }
+    const per = tokens.length ? (text.length / tokens.length).toFixed(1) : "0";
+    $("token-stats").innerHTML = `<b>${tokens.length}</b> token${tokens.length === 1 ? "" : "s"} · ${text.length} characters · ${per} characters a token`;
+  } catch {
+    $("token-stats").innerHTML = unreachable();
+  }
+}
+// The model's real vocabulary size, as llama-server reports it (/v1/models → meta.n_vocab).
+(async () => {
+  try {
+    const models = await (await fetch(`${SERVER}/v1/models`)).json();
+    const size = models.data?.[0]?.meta?.n_vocab;
+    if (size) {
+      $("vocab").textContent = `Qwen's vocabulary has ${size.toLocaleString()} pieces, fixed when the model was built.`;
+    }
+  } catch {}
+})();
+
+let typing;
+$("token-input").addEventListener("input", () => {
+  clearTimeout(typing);
+  typing = setTimeout(tokenize, 150);
+});
+tokenize();
+
+// ════════════════════════════ 2 · The model ════════════════════════════
+const EXAMPLES = {
+  "The cat sat on the": { system: "You are a helpful assistant.", prompt: "Complete the sentence with one word: The cat sat on the", temperature: 1, max_tokens: 20 },
+  "Random number": { system: "You are a helpful assistant.", prompt: "Pick a random number between 1 and 10. Reply with the number only.", temperature: 1, max_tokens: 5 },
+  "Capital of France": { system: "You are a helpful assistant.", prompt: "Complete the sentence with one word: The capital of France is", temperature: 0, max_tokens: 10 },
+  "A story": { system: "You are a novelist.", prompt: "Write the first sentence of a story about a lighthouse.", temperature: 1, max_tokens: 60 },
+  "Passwords": { system: "You are a senior security reviewer. Answer in at most two sentences and name the specific technique.", prompt: "Should I store passwords in my database?", temperature: 0, max_tokens: 120 },
+  "Passwords, YES/NO": { system: "Answer only with YES or NO.", prompt: "Should I store passwords in my database?", temperature: 0, max_tokens: 5 },
+  "A file it can't see": { system: "You are a helpful assistant.", prompt: "What is the average time per ticket in tickets.csv?", temperature: 0, max_tokens: 120 },
+};
+const SETTINGS = ["temperature", "top_k", "top_p", "max_tokens"];
+let candidates = []; // the model's raw odds for its first token: [{ token, p }]
+
+function load(name) {
+  const example = { top_k: 10, top_p: 1, ...EXAMPLES[name] };
+  $("system").value = example.system;
+  $("prompt").value = example.prompt;
+  for (const key of SETTINGS) {
+    $(key).value = example[key];
+  }
+  $("stop").value = "";
+  candidates = [];
+  for (const id of ["odds", "tally", "response", "template", "finish", "usage-short", "window", "usage"]) {
+    $(id).textContent = "";
+  }
+  $("window-fill").style.width = "0";
+  showSettings();
+}
+for (const name of Object.keys(EXAMPLES)) {
+  const chip = document.createElement("button");
+  chip.className = "chip-btn";
+  chip.textContent = name;
+  chip.addEventListener("click", () => load(name));
+  $("examples").append(chip);
+}
+
+for (const button of document.querySelectorAll("#model-steps button")) {
+  button.addEventListener("click", () => {
+    for (const b of document.querySelectorAll("#model-steps button")) {
+      b.classList.toggle("on", b === button);
+    }
+    for (const pane of document.querySelectorAll("#tab-model .pane")) {
+      pane.hidden = pane.id !== `pane-${button.dataset.step}`;
+    }
+    $("prompt-card").hidden = button.dataset.step === "memory"; // step e brings its own prompts
+  });
+}
+
+const messages = () => [{ role: "system", content: $("system").value }, { role: "user", content: $("prompt").value }];
+function options() {
+  const stop = $("stop").value;
+  return {
+    temperature: Number($("temperature").value),
+    top_k: Number($("top_k").value),
+    top_p: Number($("top_p").value),
+    min_p: 0,
+    max_tokens: Number($("max_tokens").value),
+    ...(stop ? { stop: [stop] } : {}),
+  };
+}
+function showSettings() {
+  for (const key of SETTINGS) {
+    const shown = $(`${key}-value`);
+    if (shown) {
+      shown.value = $(key).value;
+    }
+  }
+  const { temperature, top_k, top_p } = options();
+  $("ten-settings").textContent = `Temperature ${temperature}, top-k ${top_k}, top-p ${top_p}: change them under "The odds".`;
+  drawOdds();
+}
+for (const key of SETTINGS) {
+  $(key).addEventListener("input", showSettings);
+}
+
+// The odds after the settings, in llama.cpp's order: top-k, then top-p, then temperature.
+function drawOdds() {
+  const { temperature, top_k, top_p } = options();
+  explain(temperature, top_k, top_p);
+  if (!candidates.length) {
+    return;
+  }
+  const kept = new Set();
+  let total = 0;
+  for (const [i, c] of candidates.entries()) {
+    if (i >= top_k || (total >= top_p && i > 0)) {
+      break;
+    }
+    kept.add(i);
+    total += c.p;
+  }
+  const weights = candidates.map((c, i) => (kept.has(i) ? (temperature === 0 ? (i === 0 ? 1 : 0) : Math.pow(c.p, 1 / temperature)) : 0));
+  const sum = weights.reduce((a, b) => a + b, 0) || 1;
+  // Near-certain and tiny odds keep a decimal, so "nearly certain" never reads as "certain".
+  const pct = (x) => x === 0 ? "0%" : x < 0.001 ? "<0.1%" : x < 0.01 || (x > 0.99 && x < 1) ? `${(x * 100).toFixed(1)}%` : `${(x * 100).toFixed(0)}%`;
+  let running = 0;
+  const row = (label, final, was, out) => {
+    running += was;
+    return `<div class="bar-row ${out ? "out" : ""}"><span>${label}</span>
+      <span class="track"><span class="fill" style="width:${(final * 100).toFixed(1)}%"></span></span>
+      <span class="pct">${pct(final)}</span>
+      <span class="sub">model gave ${pct(was)} · running total ${pct(running)}</span></div>`;
+  };
+  // The top six, then everything else on one line, so the list stays on screen.
+  const rest = candidates.slice(6).reduce((t, c, i) => ({ final: t.final + weights[i + 6] / sum, was: t.was + c.p }), { final: 0, was: 0 });
+  $("odds").innerHTML = candidates.slice(0, 6).map((c, i) => row(JSON.stringify(c.token), weights[i] / sum, c.p, !kept.has(i))).join("")
+    + (candidates.length > 6 ? row("other", rest.final, rest.was, rest.final === 0) : "");
+  // What can really come out: crossed out by top-k or top-p, or squeezed to nothing by temperature 0, cannot.
+  const names = candidates.filter((c, i) => weights[i] > 0).map((c) => JSON.stringify(c.token));
+  $("pickable").innerHTML = `Can be picked: <b>${names.join(", ")}</b> (${names.length} of ${candidates.length})`;
+}
+
+// One plain sentence per setting, using its current value and, once loaded, the model's real candidates.
+function explain(temperature, top_k, top_p) {
+  $("k-explain").textContent = top_k >= 10
+    ? `k = ${top_k}: all ten candidates shown may be picked.`
+    : `k = ${top_k}: only the ${top_k === 1 ? "single most likely token" : `${top_k} most likely tokens`} may be picked.`;
+  if (top_p >= 1) {
+    $("p-explain").textContent = "p = 1: no cut; every candidate counts.";
+  } else {
+    let total = 0;
+    const taken = [];
+    for (const c of candidates) {
+      if (total >= top_p && taken.length) {
+        break;
+      }
+      taken.push(c);
+      total += c.p;
+    }
+    const sumText = taken.length ? `: ${taken.map((c) => JSON.stringify(c.token)).join(" + ")} = ${(total * 100).toFixed(0)}%` : "";
+    $("p-explain").textContent = `p = ${top_p}: keep tokens, most likely first, until their odds add up to ${(top_p * 100).toFixed(0)}%${sumText}.`;
+  }
+  $("t-explain").textContent =
+    temperature === 0 ? "0: always the favourite. The same answer every time."
+    : temperature < 0.8 ? `${temperature}: the favourite wins even more often than the model's odds say.`
+    : temperature <= 1.1 ? `${temperature}: the odds as the model gave them.`
+    : temperature <= 1.5 ? `${temperature}: underdogs win more often. More variety.`
+    : `${temperature}: close to random. Text starts turning to nonsense (2 is the usual maximum).`;
+}
+
+action("show-odds", async () => {
+  // The model's own odds: the server reports probabilities after its sampling settings, so ask with neutral ones
+  // (temperature 1, nothing cut off). The sliders on this page then reshape these odds, as a sampler would.
+  // A few tokens, then the first one that isn't a line break or a space: that is the first real word.
+  const response = await call("/v1/chat/completions", {
+    messages: messages(), max_tokens: 4, logprobs: true, top_logprobs: 10,
+    temperature: 1, top_k: 0, top_p: 1, min_p: 0,
+  });
+  const tokens = response.choices[0].logprobs.content;
+  const top = (tokens.find((t) => t.token.trim()) ?? tokens[0]).top_logprobs;
+  const raw = top.map((t) => ({ token: t.token, p: Math.exp(t.logprob) }));
+  const sum = raw.reduce((a, b) => a + b.p, 0);
+  candidates = raw.map((c) => ({ token: c.token, p: c.p / sum }));
+  drawOdds();
+}, () => ($("odds").innerHTML = unreachable()));
+
+// Replies as token boxes, or as plain text: the same boxes, drawn differently. The choice is remembered.
+let asText = false;
+try {
+  asText = localStorage.getItem("replies") === "text";
+} catch {}
+function showToken(box) {
+  const raw = box.dataset.raw;
+  box.textContent = asText ? raw : raw.replaceAll(" ", "␣").replaceAll("\n", "↵");
+}
+function setReplyView(text) {
+  asText = text;
+  $("tab-model").classList.toggle("as-text", text);
+  for (const b of document.querySelectorAll("#reply-view button")) {
+    b.classList.toggle("on", (b.dataset.view === "text") === text);
+  }
+  for (const box of document.querySelectorAll("#tab-model .picks .token")) {
+    showToken(box);
+  }
+  try {
+    localStorage.setItem("replies", text ? "text" : "tokens");
+  } catch {}
+}
+for (const b of document.querySelectorAll("#reply-view button")) {
+  b.addEventListener("click", () => setReplyView(b.dataset.view === "text"));
+}
+setReplyView(asText);
+
+// Stream a reply into token boxes (the first labelled "1st pick"). Returns its text, finish reason and usage.
+async function streamInto(target, sent, settings) {
+  target.textContent = "";
+  const response = await fetch(`${SERVER}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ messages: sent, ...settings, stream: true, stream_options: { include_usage: true } }),
+  });
+  if (!response.ok) {
+    throw new Error(`the model server said ${response.status}: ${await response.text()}`);
+  }
+  let text = "";
+  let finish = "";
+  let usage = null;
+  for await (const chunk of events(response)) {
+    const piece = chunk.choices[0]?.delta?.content ?? "";
+    if (piece) {
+      text += piece;
+      const box = document.createElement("span");
+      box.className = target.childElementCount ? "token" : "token first";
+      box.dataset.raw = piece;
+      showToken(box);
+      target.append(box);
+    }
+    finish = chunk.choices[0]?.finish_reason ?? finish;
+    usage = chunk.usage ?? usage;
+  }
+  return { text, finish, usage };
+}
+
+// How full the context window is, as a bar and a line.
+async function meter(fill, line, usage) {
+  if (!usage) {
+    return;
+  }
+  const size = await contextWindow();
+  fill.style.width = `${Math.max(0.5, (usage.total_tokens / size) * 100)}%`;
+  line.textContent = `context window: ${usage.total_tokens.toLocaleString()} of ${size.toLocaleString()} tokens used`;
+}
+
+action("run", async () => {
+  for (const id of ["finish", "usage-short", "window", "usage"]) {
+    $(id).textContent = "";
+  }
+  const { finish, usage } = await streamInto($("response"), messages(), options());
+  $("finish").textContent = `stopped: ${finish === "length" ? "hit max tokens" : "ended its turn"}`;
+  if (usage) {
+    $("usage-short").textContent = `${usage.prompt_tokens} tokens in · ${usage.completion_tokens} out`;
+    await meter($("window-fill"), $("window"), usage);
+    $("usage").textContent = `usage: ${JSON.stringify(usage, null, 2)}\nfinish_reason: ${finish}`;
+  }
+}, () => ($("response").innerHTML = unreachable()));
+
+action("ten", async () => {
+  const counts = {};
+  $("tally").innerHTML = "";
+  for (let i = 0; i < 10; i++) {
+    const response = await call("/v1/chat/completions", { messages: messages(), ...options() });
+    const answer = response.choices[0].message.content.trim() || "(empty)";
+    counts[answer] = (counts[answer] ?? 0) + 1;
+    $("tally").innerHTML = Object.entries(counts).sort((a, b) => b[1] - a[1])
+      .map(([text, n]) => `<span>${text.replaceAll("<", "&lt;")}<small>×${n}</small></span>`).join("");
+  }
+}, () => ($("tally").innerHTML = unreachable()));
+
+// The read_file tool the agent gets in tab 3, described the way the app sends it to the model.
+const READ_FILE = { type: "function", function: { name: "read_file", description: "Read a file", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } } };
+const withTool = () => ({ messages: messages(), ...($("t-tool").checked ? { tools: [READ_FILE] } : {}) });
+
+action("show-template", async () => {
+  const { prompt } = await call("/apply-template", withTool());
+  $("template").textContent = prompt;
+}, () => ($("template").innerHTML = unreachable()));
+
+// The model's raw reply to that one text, before any app reads it: a tool call is only text it writes.
+action("t-reply", async () => {
+  const { prompt } = await call("/apply-template", withTool());
+  $("template").textContent = prompt;
+  const { content } = await call("/completion", { prompt, temperature: 0, n_predict: 80 });
+  $("t-raw").textContent = content;
+  $("t-note").textContent = content.includes("<tool_call>")
+    ? "It wrote a request to use the tool. On its own, nothing carries it out: that is the app's job (tab 3)."
+    : "It answered in plain text: it did not ask for a tool.";
+}, () => ($("t-raw").innerHTML = unreachable()));
+
+load("Random number");
+
+// ── e · Memory and the window ──
+const PLAIN = { temperature: 0, top_k: 0, top_p: 1, min_p: 0, max_tokens: 150 };
+const SYSTEM_SHORT = { role: "system", content: "You are a helpful assistant. Keep answers short." };
+let history = []; // the conversation so far, as the app keeps it; "send the history" decides if the model sees it
+
+// What was sent, one line per message (long ones shortened), so the context is visible.
+function showSent(target, sent) {
+  target.innerHTML = sent.map((m) => {
+    const text = m.content.length > 140 ? `${m.content.slice(0, 140)}… (${m.content.length.toLocaleString()} characters)` : m.content;
+    return `<div><b>${m.role}:</b> ${text.replaceAll("<", "&lt;")}</div>`;
+  }).join("");
+}
+
+async function talk(text) {
+  const sent = [SYSTEM_SHORT, ...($("m-history").checked ? history : []), { role: "user", content: text }];
+  showSent($("m-sent"), sent);
+  const { text: reply, usage } = await streamInto($("m-reply"), sent, PLAIN);
+  history.push({ role: "user", content: text }, { role: "assistant", content: reply });
+  await meter($("m-fill"), $("m-window"), usage);
+}
+action("m-name", () => talk("My name is Zafar."), () => ($("m-reply").innerHTML = unreachable()));
+action("m-ask", () => talk("What is my name?"), () => ($("m-reply").innerHTML = unreachable()));
+$("m-reset").addEventListener("click", () => {
+  history = [];
+  for (const id of ["m-sent", "m-reply", "m-window"]) {
+    $(id).textContent = "";
+  }
+  $("m-fill").style.width = "0";
+});
+
+// 160 lines of ordinary server logs (about 7,000 tokens), the same every time, so a second ask re-uses the cache.
+function logs() {
+  const lines = [];
+  for (let i = 0; i < 160; i++) {
+    const n = (i * 7919) % 100000;
+    lines.push(`2026-10-30 09:${String(10 + Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")} INFO GET /api/orders/${n} 200 ${20 + ((i * 37) % 180)}ms user=u${(i * 131) % 5000}`);
+  }
+  return lines;
+}
+
+let csv = "";
+$("f-bury").addEventListener("change", () => {
+  if ($("f-bury").checked) { // burying the file means it is pasted in
+    $("f-paste").checked = true;
+  }
+});
+$("f-paste").addEventListener("change", () => {
+  if (!$("f-paste").checked) {
+    $("f-bury").checked = false;
+  }
+});
+action("f-ask", async () => {
+  const question = "How many hours did ticket DMS-107 take?";
+  let content = question;
+  if ($("f-paste").checked) {
+    if (!csv) {
+      const response = await fetch("/tickets.csv");
+      if (!response.ok) {
+        $("f-reply").innerHTML = `<span class="error">The demo server did not send tickets.csv (${response.status}). Restart bun server.ts.</span>`;
+        return;
+      }
+      csv = await response.text();
+    }
+    const file = `tickets.csv:\n${csv}`;
+    if ($("f-bury").checked) {
+      const lines = logs();
+      content = `${question}\n\nserver.log:\n${lines.slice(0, 80).join("\n")}\n\n${file}\nserver.log (continued):\n${lines.slice(80).join("\n")}`;
+    } else {
+      content = `${question}\n\n${file}`;
+    }
+  }
+  const sent = [SYSTEM_SHORT, { role: "user", content }];
+  showSent($("f-sent"), sent);
+  $("f-time").textContent = "";
+  const started = performance.now();
+  const { usage } = await streamInto($("f-reply"), sent, PLAIN);
+  const seconds = ((performance.now() - started) / 1000).toFixed(1);
+  const cached = usage?.prompt_tokens_details?.cached_tokens ?? 0;
+  $("f-time").textContent = `took ${seconds} s · read ${(usage?.prompt_tokens ?? 0).toLocaleString()} tokens, ${cached.toLocaleString()} of them from the cache · the answer is 12`;
+  await meter($("f-fill"), $("f-window"), usage);
+}, () => ($("f-reply").innerHTML = unreachable()));
+
+
+// ════════════════════════════ 3 · The agent ════════════════════════════
+// It runs on the demo server (bun server.ts): the same runAgent() as the terminal, step by step.
+
+const CHOICES = ["readFile", "runCommand", "writeFile", "rules", "askPermission", "turnLimit", "verify", "evaluate"];
+
+function view(name) {
+  for (const b of document.querySelectorAll(".views button")) {
+    b.classList.toggle("on", b.dataset.view === name);
+  }
+  for (const v of document.querySelectorAll(".view")) {
+    v.hidden = v.id !== `view-${name}`;
+  }
+}
+for (const b of document.querySelectorAll(".views button")) {
+  b.addEventListener("click", () => view(b.dataset.view));
+}
+
+function say(className, text) {
+  const line = document.createElement("div");
+  line.className = className;
+  line.textContent = text;
+  $("view-talk").append(line);
+  $("view-talk").scrollTop = $("view-talk").scrollHeight;
+  return line;
+}
+
+function showTests(results) {
+  $("a-checks").innerHTML = results.map((r) => `<li class="${r.passed ? "ok" : "no"}">${r.name.replaceAll("<", "&lt;")}</li>`).join("");
+  const failed = results.filter((r) => !r.passed).length;
+  $("a-count").hidden = false;
+  $("a-count").className = `count${failed ? "" : " ok"}`;
+  $("a-count").textContent = failed ? `${failed} ✗` : "all ✓";
+}
+
+// Every test on its own line in the conversation, ✓ or ✗
+function sayTests(results) {
+  for (const r of results) {
+    say(r.passed ? "good" : "bad", `  ${r.passed ? "✓" : "✗"} ${r.name}`);
+  }
+}
+
+// A finished tool request, readable: write_file(site/index.html, 74 lines) rather than a wall of escaped JSON.
+function summarise(name, args) {
+  try {
+    const { path, content, command } = JSON.parse(args);
+    if (command) {
+      return `${name}(${command.length > 100 ? `${command.slice(0, 100)}…` : command})`;
+    }
+    return `${name}(${path ?? ""}${typeof content === "string" ? `, ${content.trimEnd().split("\n").length} lines` : ""})`;
+  } catch {
+    return `${name}(${args.slice(0, 60)})`;
+  }
+}
+
+function reloadPage() {
+  $("a-page").src = `/site/index.html?${Date.now()}`;
+}
+
+// Under the hood, for the room (not part of the agent): code checks the answer against the file, and the odds show
+// how the model wrote its number: one digit at a time, each the likeliest next token. Nothing added anything up.
+async function explainAnswer(words, odds) {
+  const answer = words.textContent;
+  const hours = (await (await fetch("/tickets.csv")).text()).trim().split("\n").slice(1).map((row) => Number(row.split(",")[2]));
+  const total = hours.reduce((sum, h) => sum + h, 0);
+  const average = Number((total / hours.length).toFixed(2));
+  const pct = (p) => (p < 0.001 ? "<0.1%" : p >= 0.9995 ? "100%" : p < 0.01 || p > 0.99 ? `${(p * 100).toFixed(1)}%` : `${(p * 100).toFixed(0)}%`);
+  const box = document.createElement("div");
+  box.className = "why";
+  const line = (...parts) => {
+    const div = document.createElement("div");
+    div.append(...parts);
+    box.append(div);
+  };
+  const mark = (text, className) => Object.assign(document.createElement("span"), { className, textContent: text });
+  const col = (n) => String(n).padStart(4);
+  // A number with the digits that differ from the other one marked (red where it is wrong, green where it is right)
+  const digits = (text, other, className) => [...text].map((c, i) => (text.length === other.length && c !== other[i] ? mark(c, className) : c));
+
+  line(mark("── checking the answer: our code adds up the file, not the model", "head"));
+  let explained = null; // the number whose digits we show: where it is in the answer, and the right value
+  let itsTotal = null;
+  for (const m of answer.matchAll(/((?:\d+(?:\.\d+)?\s*\+\s*)+\d+(?:\.\d+)?)\s*=\s*\**\s*(\d+(?:\.\d+)?)/g)) {
+    const terms = m[1].split("+").map((t) => Number(t.trim()));
+    if (terms.length !== hours.length) { // only the sum of the whole column
+      continue;
+    }
+    const copied = terms.every((n, i) => n === hours[i]);
+    let running = 0;
+    line("the file       ", hours.map(col).join(""));
+    line("it copied      ", ...terms.map((n, i) => (n === hours[i] ? col(n) : mark(col(n), "bad"))), copied ? mark(`   ✓ all ${terms.length} right`, "good") : mark("   ✗ copied wrong", "bad"));
+    line("running total  ", hours.map((h) => col((running += h))).join(""), mark("   ← what adding up looks like", "good"));
+    line(" ");
+    const given = m[2];
+    line("its total      ", ...digits(given, String(total), "bad"), "     real total  ", ...digits(String(total), given, "good"),
+      Number(given) === total ? mark("   ✓", "good") : mark(`   ✗ off by ${total - Number(given)}`, "bad"));
+    explained = { text: given, at: m.index + m[0].length - given.length, right: String(total) };
+    itsTotal = Number(given);
+    break;
+  }
+  const numbers = answer.match(/\d+(?:\.\d+)?/g) ?? [];
+  const last = numbers.at(-1) ?? "";
+  line("its average    ", ...digits(last, String(average), "bad"), "   real average  ", ...digits(String(average), last, "good"),
+    Math.abs(Number(last) - average) < 0.01 ? mark("   ✓", "good") : mark("   ✗", "bad"));
+  if (itsTotal !== null && itsTotal !== total && Math.abs(Number(last) - itsTotal / hours.length) < 0.01) {
+    line(`               ${itsTotal} ÷ ${hours.length} is ${last}: the division is right, the total was wrong`);
+  }
+  explained ??= { text: last, at: answer.lastIndexOf(last), right: String(average) };
+
+  // How it wrote that number: the odds of each of its tokens, from the same request asked again
+  const written = odds.map((t) => t.token).join("");
+  if (odds.length && answer.startsWith(written)) {
+    line(" ");
+    line(mark(`── how it wrote ${explained.text}: one token at a time, each the likeliest next one`, "head"));
+    let at = 0;
+    let mistakes = 0;
+    for (const t of odds) {
+      const start = at;
+      at += t.token.length;
+      if (at <= explained.at || start >= explained.at + explained.text.length) {
+        continue;
+      }
+      const right = explained.right[start - explained.at];
+      const wrong = explained.text.length === explained.right.length && right !== undefined && t.token.trim() !== right;
+      const rightOdds = t.next.find((n) => n.token === right);
+      if (wrong) {
+        mistakes++;
+      }
+      line(`  ${JSON.stringify(t.token).padEnd(6)}${pct(t.p).padStart(6)}`,
+        t.p < 0.9 ? `   next: ${t.next.map((n) => `${JSON.stringify(n.token)} ${pct(n.p)}`).join(", ")}` : "",
+        wrong ? mark(`   ← the mistake${rightOdds ? `: the right "${right}" had only ${pct(rightOdds.p)}` : ""}`, "bad") : "");
+    }
+    if (mistakes) {
+      line(" ");
+      line(mark("Nothing added the numbers up. It wrote the likeliest digit each time, and one likeliest digit was wrong.", "bad"));
+    }
+  }
+  words.after(box);
+}
+
+// A sign of life while the model works (like Claude Code's): a spinner, a changing word, and the seconds so far.
+const WORDS = ["Thinking", "Reading the conversation", "Predicting the next token", "Weighing the odds", "Pondering", "Mulling it over"];
+function showWorking() {
+  const line = say("working", "");
+  const start = Date.now();
+  let word = WORDS[0];
+  let frame = 0;
+  const draw = () => {
+    if (frame % 14 === 13) {
+      word = WORDS[Math.floor(Math.random() * WORDS.length)];
+    }
+    line.textContent = `${"✻✳✢·✢✳"[frame % 6]} ${word}… ${Math.floor((Date.now() - start) / 1000)}s`;
+    frame++;
+  };
+  draw();
+  const timer = setInterval(draw, 150);
+  return () => {
+    clearInterval(timer);
+    line.remove();
+  };
+}
+
+async function runTheAgent() {
+  $("view-talk").textContent = "";
+  $("a-checks").innerHTML = "";
+  $("a-count").hidden = true;
+  view("talk");
+  $("a-turn").textContent = "";
+  document.querySelector(".agent").scrollIntoView({ behavior: "smooth", block: "start" }); // the conversation fills the screen
+  let words = null; // where the model's streamed words go
+  let listing = null; // the newest turn's list of messages
+  let waiting = null; // the line shown while the odds are on their way
+  let spinner = null; // stops the "Thinking…" line while the model works
+  let request = null; // the tool request being written
+  let name = ""; // its tool
+  let args = ""; // its arguments so far (JSON, streaming in)
+  const task = document.querySelector('input[name="a-task"]:checked').value;
+  const choices = { task, ...Object.fromEntries(CHOICES.map((id) => [id, $(`a-${id}`).checked])) };
+  const response = await fetch("/agent/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(choices) });
+
+  for await (const event of events(response)) {
+    if (event.type === "turn") {
+      // Each turn the model reads the whole conversation again, a little longer every time.
+      if (listing) { // fold the last turn's list: only the newest stays open
+        listing.hidden = true;
+      }
+      const header = say("turn", `── turn ${event.turn} · the model reads the whole conversation: ${event.messages.length} messages`);
+      const list = (listing = say("msgs", ""));
+      for (const [i, m] of event.messages.entries()) {
+        const line = document.createElement("div");
+        line.innerHTML = `   ${i + 1} <b>${m.role.padEnd(10)}</b> <i>${m.from.padEnd(10)}</i> `;
+        line.append(m.text);
+        list.append(line);
+      }
+      header.addEventListener("click", () => (list.hidden = !list.hidden)); // click a turn to open or fold its list
+      $("a-turn").textContent = `loop: turn ${event.turn}`;
+      words = null;
+      if (event.turn === 1) { // the page was reset to the original
+        reloadPage();
+      }
+    } else if (event.type === "text") {
+      (words ??= say("", "")).textContent += event.piece;
+    } else if (event.type === "call") {
+      words = null;
+      name = event.name;
+      args = "";
+      request = say("call", `⏺ ${name}(`);
+    } else if (event.type === "args" && request) {
+      args += event.piece;
+      // after 60 characters, a count that keeps moving, so a long request (a whole file) does not look stuck
+      request.textContent = `⏺ ${name}(${args.slice(0, 60)}${args.length > 60 ? `… ${args.length.toLocaleString()} characters so far` : ""}`;
+    } else if (event.type === "result") {
+      if (request) {
+        request.textContent = `⏺ ${summarise(name, args)}`;
+      }
+      request = null;
+      say("result", `  ⎿  ${event.shown}`); // up to 5 lines in full, longer ones as a line count
+      if (event.result.startsWith("Wrote")) {
+        reloadPage();
+      }
+    } else if (event.type === "context") {
+      $("a-fill").style.width = `${Math.max(0.5, (event.used / event.size) * 100)}%`;
+      $("a-window").textContent = `context window: ${event.used.toLocaleString()} of ${event.size.toLocaleString()} tokens used; the whole conversation is sent every turn`;
+    } else if (event.type === "verified") {
+      showTests(event.results);
+      const failed = event.results.filter((r) => !r.passed).length;
+      say(failed ? "bad" : "good", failed ? `⏺ tests failed: ${failed} of ${event.results.length}` : `⏺ tests passed: all ${event.results.length}`);
+      sayTests(event.results);
+    } else if (event.type === "graded") {
+      showTests(event.results);
+      say("turn", "── evaluation, after the run: the site's tests (not the model)");
+      sayTests(event.results);
+    } else if (event.type === "ask") {
+      $("a-question").textContent = event.question;
+      $("a-ask").hidden = false;
+    } else if (event.type === "stop") {
+      say("bad", `STOP: ${event.reason}`);
+    } else if (event.type === "error") {
+      say("bad", `Error: ${event.message}`);
+    } else if (event.type === "working") {
+      spinner = showWorking();
+    } else if (event.type === "working-done") {
+      spinner?.();
+      spinner = null;
+    } else if (event.type === "odds-wait") {
+      waiting = task === "tickets" ? say("result", "Checking the answer, and asking the model again with its odds switched on…") : null;
+    } else if (event.type === "odds") {
+      waiting?.remove();
+      if (task === "tickets" && words) {
+        await explainAnswer(words, event.odds);
+      }
+    } else if (event.type === "done") {
+      say("turn", "── finished");
+      reloadPage();
+    }
+  }
+}
+
+async function answer(allow) {
+  $("a-ask").hidden = true;
+  say("result", allow ? "  ⎿  you said yes" : "  ⎿  you said no");
+  await fetch("/agent/answer", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ allow }) });
+}
+$("a-yes").addEventListener("click", () => answer(true));
+$("a-no").addEventListener("click", () => answer(false));
+action("a-run", runTheAgent, (error) => say("bad", `Could not run the agent. Is the demo server running (bun server.ts)? ${error.message}`));
+reloadPage();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+node_modules/
+models/
+*.log
+.tests.xml
+.DS_Store
+
+# the agent's working copy of the page (made from site/original.*) and each run's result
+site/index.html
+site/styles.css
+site/result-*.html
