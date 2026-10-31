@@ -74,9 +74,38 @@ bun server.ts
 ```
 
 It starts `llama-server` on port 8080 (its log goes to `llama-server.log`) and the web page on
-<http://localhost:3008>. Ctrl-C stops both.
+<http://localhost:3008>. Ctrl-C stops both. The same command works in PowerShell on Windows.
 
-**2. In a second terminal, run the steps:**
+**2. Then follow the six steps in your browser or in a second terminal.** Both run the same code; pick one.
+
+### In the browser
+
+Open <http://localhost:3008>. The page has three tabs:
+
+1. **Tokens:** type anything and see how the model splits it into tokens, as you type.
+2. **The model:** the model on its own, one idea at a time: ask it something, see its odds for the next word, change
+   temperature, top-k and top-p, ask ten times, see the text the model really reads, and watch it forget between calls.
+3. **The agent:** pick a task (*Average of tickets.csv* or *Add a Contact section*), switch harness pieces on, and press
+   **Run the agent**. Each turn is marked as it runs, beside the conversation, the page it edits and its tests. When
+   **ask permission** is on, Yes and No buttons appear before each command it runs or file it writes.
+
+The six steps, as switches on the agent tab:
+
+| Step | Task | Switch on |
+|---|---|---|
+| 1 | Average of tickets.csv | `read_file` |
+| 2 | Average of tickets.csv | + `run_command` |
+| 3 | Average of tickets.csv | + `rules` |
+| 4 | Average of tickets.csv | + `ask permission` |
+| 5 | Average of tickets.csv | + `turn limit` |
+| 6 | Add a Contact section | all of the above, + `write_file` and `verification` |
+
+`evaluation` grades the result with the same tests after the agent stops; nothing goes back to the model, so it
+changes nothing in the run.
+
+### In the terminal
+
+In a second terminal, in this folder:
 
 ```bash
 bun agent/1-loop.ts
@@ -90,8 +119,7 @@ bun agent/6-verify.ts
 Each turn of the loop is marked, with every message the model reads. The model runs at temperature 0, so a step gives
 the same answer every time on the same machine.
 
-**The web page** has three tabs: what tokens are, the model's odds for its next word, and the agent with every harness
-piece as a switch.
+Don't run the website task in the browser and the terminal at the same time: both write the page in `site/`.
 
 **More to try:**
 
