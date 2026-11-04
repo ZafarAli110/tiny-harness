@@ -629,7 +629,7 @@ function explain(temperature, top_k, top_p) {
       total += c.p;
     }
     const sumText = taken.length ? `: ${taken.map((c) => JSON.stringify(c.token)).join(" + ")} = ${(total * 100).toFixed(0)}%` : "";
-    $("p-explain").textContent = `p = ${top_p}: keep tokens, most likely first, until their odds add up to ${(top_p * 100).toFixed(0)}%${sumText}.`;
+    $("p-explain").textContent = `p = ${top_p}: the draw is only among the favourites whose odds add up to ${(top_p * 100).toFixed(0)}%${sumText}. Top-p doesn't pick; it decides who may be picked.`;
   }
   $("t-explain").textContent =
     temperature === 0 ? "0: always the favourite. The same answer every time."
