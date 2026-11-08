@@ -48,6 +48,10 @@ powershell -ExecutionPolicy Bypass -File .\setup.ps1
 llama.cpp goes into `%LOCALAPPDATA%\tiny-harness\llama.cpp` (the CPU build: no graphics card needed). Then **open a new
 terminal** so it sees the updated PATH.
 
+Every Monday, and whenever the setup changes, a fresh Windows machine on GitHub runs this script, the TypeScript check
+and the model answering one prompt (`.github/workflows/windows-setup.yml`), so a download that moved shows up there
+before it shows up on your machine.
+
 ### macOS and Linux
 
 In a terminal, in this folder:

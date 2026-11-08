@@ -1,0 +1,46 @@
+name: windows-setup
+
+# A fresh Windows machine follows the README the way a newcomer does: setup.ps1 (Bun, llama.cpp, the 2.7 GB Qwen
+# model), then the TypeScript check, then llama-server with that model answering one prompt. It catches a setup step
+# that breaks, a download that moved, and code that only works on macOS or Linux.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC: the model and llama.cpp downloads can move without a commit here
+  push:
+    branches: [main]
+    paths:
+      - setup.ps1
+      - package.json
+      - bun.lock
+      - .github/workflows/windows-setup.yml
+
+jobs:
+  setup:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: setup.ps1, as a newcomer runs it
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File .\setup.ps1
+      - name: The TypeScript check, and the model answering through llama-server
+        shell: powershell
+        run: |
+          # A new terminal: the PATH setup.ps1 saved (Bun, llama-server).
+          $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+          bun run check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $server = Start-Process llama-server -ArgumentList "-m", "models\Qwen3.5-4B-Q4_K_M.gguf", "--port", "8080", "-c", "4096" -PassThru -NoNewWindow
+          $ready = $false
+          foreach ($attempt in 1..120) {
+            try { if ((Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8080/health).StatusCode -eq 200) { $ready = $true; break } } catch { }
+            Start-Sleep -Seconds 2
+          }
+          if (-not $ready) { Stop-Process $server.Id; throw "llama-server did not become ready in 4 minutes" }
+          $body = '{"prompt": "The cat sat on the", "max_tokens": 5, "temperature": 0}'
+          $answer = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $body http://127.0.0.1:8080/v1/completions
+          Stop-Process $server.Id
+          $text = $answer.choices[0].text
+          Write-Host "The model answered: '$text'"
+          if (-not $text) { throw "the model gave no text" }
